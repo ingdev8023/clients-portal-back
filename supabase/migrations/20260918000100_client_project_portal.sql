@@ -781,7 +781,10 @@ for select
 to authenticated
 using (
   app.is_admin()
-  or (deleted_at is null and app.can_access_project(project_id))
+  or (
+    app.can_access_project(project_id)
+    and (deleted_at is null or user_id = auth.uid())
+  )
 );
 
 create policy comments_insert_accessible

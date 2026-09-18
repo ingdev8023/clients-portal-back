@@ -5,14 +5,16 @@ Primera etapa del portal privado de clientes usando Supabase como backend. No in
 ## Entregables
 
 - Migración principal: `supabase/migrations/20260918000100_client_project_portal.sql`
+- Endurecimiento de funciones: `supabase/migrations/20260918000200_harden_trigger_search_paths.sql`
 - Seed demo editable: `supabase/seed.sql`
 - Pruebas manuales RLS: `docs/rls-test-queries.sql`
+- Resultados de verificación local y remota: `docs/backend-test-report.md`
 - Plan de la siguiente etapa: `docs/frontend-implementation-plan.md`
 - Planes originales: `implementation_plan.md` y `implementation_plan_front.md`
 
-La migración es una sola transacción con nombre compatible con Supabase CLI. El seed y las pruebas se ejecutan por separado para que un despliegue no inserte datos demo ni ejecute consultas de prueba.
+Cada migración es una transacción con nombre compatible con Supabase CLI. El seed y las pruebas se ejecutan por separado para que un despliegue no inserte datos demo ni ejecute consultas de prueba.
 
-Los SQL iniciales del primer plan están conservados en `docs/reference/stage1-sql/`. Son material histórico, no migraciones activas; ejecuta únicamente la migración con timestamp indicada arriba. Las rutas absolutas de archivos dentro de `implementation_plan.md` pertenecen a su ubicación original.
+Los SQL iniciales del primer plan están conservados en `docs/reference/stage1-sql/`. Son material histórico, no migraciones activas; ejecuta únicamente las dos migraciones con timestamp indicadas arriba y en ese orden. Las rutas absolutas de archivos dentro de `implementation_plan.md` pertenecen a su ubicación original.
 
 ## Arquitectura
 
@@ -43,7 +45,7 @@ erDiagram
 - Helpers RLS: `app.is_admin()`, `app.can_access_client()` y `app.can_access_project()` viven fuera del esquema público expuesto por la API. Son `SECURITY DEFINER`, usan `search_path = ''` y consultan el rol y la pertenencia del usuario autenticado.
 - Seguridad anti-DevTools: aunque el cliente modifique IDs o llamadas al SDK, `app.can_access_project()` y `app.can_access_client()` verifican pertenencia real en PostgreSQL.
 - Auditoría: triggers generan logs para creación, actualización y borrado de proyectos, fases y pagos, incluidos cambios de estado/progreso y cierre. `audit_logs.project_id` conserva el UUID incluso si se borra el proyecto. Los clientes no pueden leer los logs.
-- Comentarios: clientes y admin pueden crear comentarios. Cada autor puede editar o hacer soft-delete de un comentario propio durante 15 minutos; el admin puede moderar comentarios en cualquier momento. Nadie tiene permiso de borrado físico por SDK.
+- Comentarios: clientes y admin pueden crear comentarios. Cada autor puede editar o hacer soft-delete de un comentario propio durante 15 minutos; el admin puede moderar comentarios en cualquier momento. El autor conserva lectura de su comentario eliminado para que RLS permita el soft-delete; la UI filtra `deleted_at is null`. Nadie tiene permiso de borrado físico por SDK.
 - Cierre de proyecto: al poner `status = completed`, el trigger fija `completed_at` y fuerza `progress_percentage = 100`. El historial permanece.
 - Service role/secret key: nunca va en React, Vite, Netlify público ni navegador. Si en el futuro hace falta una acción privilegiada, debe ejecutarse en Supabase Edge Functions, Netlify Functions o un backend controlado.
 
@@ -92,7 +94,7 @@ ADMIN:
 
 CLIENT:
 
-- Lee solo su `client`, sus `projects`, fases, updates, payments y comentarios no eliminados.
+- Lee solo su `client`, sus `projects`, fases, updates, payments y comentarios no eliminados; también puede leer sus propios comentarios eliminados.
 - Inserta comentarios solo en proyectos accesibles y solo con `user_id = auth.uid()`.
 - Puede editar o hacer soft-delete de comentarios propios durante 15 minutos.
 - Puede actualizar su `profiles.full_name`, pero no su rol.
@@ -101,7 +103,7 @@ CLIENT:
 ## Configuración Supabase
 
 1. Crea un proyecto Supabase y desactiva el registro público en Authentication > General configuration: apaga `Allow new users to sign up`. Conserva habilitado el acceso por email y contraseña.
-2. Ejecuta `supabase/migrations/20260918000100_client_project_portal.sql` desde SQL Editor o Supabase CLI.
+2. Ejecuta las dos migraciones de `supabase/migrations/` en orden desde SQL Editor, o usa `supabase db push` con el proyecto vinculado.
 3. En Authentication > Users crea manualmente y confirma estos usuarios:
    - `admin@example.com`
    - `client@example.com`
@@ -146,7 +148,7 @@ select * from public.projects order by created_at desc;
 select * from public.project_phases where project_id = '<project_id>' order by position;
 select * from public.project_updates where project_id = '<project_id>' order by created_at desc;
 select * from public.payments where project_id = '<project_id>' order by due_date nulls last;
-select * from public.comments where project_id = '<project_id>' order by created_at;
+select * from public.comments where project_id = '<project_id>' and deleted_at is null order by created_at;
 ```
 
 Cliente creando comentario:

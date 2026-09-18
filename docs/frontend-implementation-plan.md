@@ -33,7 +33,7 @@ No fijar versiones exactas en este documento. Al implementar, instalar versiones
 | `project_phases` | Lee fases del proyecto accesible | CRUD | Maximo una activa por proyecto; el trigger sincroniza `projects.current_phase_id`. |
 | `project_updates` | Lee timeline | Crea, edita `title`/`message` y elimina | En cada alta, `created_by` debe ser el ID del admin autenticado. |
 | `payments` | Solo lectura | CRUD | Son estados informativos. `paid_at` lo gestiona el trigger; `overdue` no se calcula automaticamente. |
-| `comments` | Lee comentarios visibles; crea y edita/soft-delete los propios durante 15 minutos | Lee, responde y modera | `user_id` debe ser el usuario actual; sin borrado fisico. Cliente no ve filas con `deleted_at`. |
+| `comments` | Lee comentarios visibles; crea y edita/soft-delete los propios durante 15 minutos | Lee, responde y modera | `user_id` debe ser el usuario actual; sin borrado fisico. RLS permite al autor leer sus propios comentarios eliminados; la UI filtra `deleted_at is null`. |
 | `audit_logs` | Sin acceso | Solo lectura | Actividad administrativa por proyecto, con cambios y borrados. |
 
 Los campos `id`, `created_at`, `updated_at`, `started_at`, `completed_at`, `paid_at` y `deleted_at` se muestran segun corresponda, pero no se envian como valores arbitrarios desde los formularios. En particular, la UI no escribe `current_phase_id`: se cambia el estado de la fase y el trigger lo sincroniza. Una fase tampoco se traslada a otro proyecto.
@@ -82,7 +82,7 @@ El perfil de otro usuario no es visible para un cliente. En comentarios del MVP 
 - `/portal`: mostrar nombre del cliente, cantidad de proyectos y lista escaneable con nombre, estado, progreso y proxima fecha. Con un solo proyecto, este se destaca como fila principal; la pagina sigue funcionando cuando haya varios.
 - `/portal/projects/:id`: cabecera con nombre y estado; progreso tomado de `projects.progress_percentage`; fase activa tomada de `current_phase_id` y lista `project_phases` ordenada por `position`; fechas y descripcion del proyecto.
 - Timeline de `project_updates` de mas reciente a mas antiguo; estados de pagos con descripcion, importe COP, vencimiento y estado del registro. No mostrar boton de pagar ni inferir `overdue` solo por la fecha.
-- Conversacion cronologica: leer `comments` del proyecto, enviar con `user_id = auth.uid`, permitir editar o hacer soft-delete de comentario propio si `created_at` esta dentro de 15 minutos. El reloj local solo controla si se muestra el boton; la policy decide si se acepta. Refrescar tras error/guardado.
+- Conversacion cronologica: leer `comments` del proyecto con `deleted_at is null`, enviar con `user_id = auth.uid`, permitir editar o hacer soft-delete de comentario propio si `created_at` esta dentro de 15 minutos. El reloj local solo controla si se muestra el boton; la policy decide si se acepta. Refrescar tras error/guardado.
 - Al completar un proyecto, mostrar fecha de cierre y mantener fases, updates, pagos y comentarios accesibles. Un proyecto sin fases o actualizaciones usa un estado vacio especifico, no un bloque en blanco.
 
 ### Area del administrador
@@ -95,7 +95,7 @@ El perfil de otro usuario no es visible para un cliente. En comentarios del MVP 
 - Fases: crear al final, editar nombre/descripcion/estado, borrar con confirmacion. Para pasar a otra fase activa, completar o desactivar la anterior y luego activar la siguiente, mostrando cada resultado. No prometer un cambio atomico de dos fases desde el navegador. Si el segundo paso falla, dejar el estado actual visible y ofrecer reintentar.
 - Actualizaciones: publicar con `created_by = user.id`, editar solo `title`/`message`, eliminar con confirmacion. El timeline usa `created_at` del servidor.
 - Pagos: crear/editar descripcion, importe, estado y vencimiento, o eliminar con confirmacion. El administrador marca `paid`/`overdue` manualmente; al volver a `pending`, el trigger limpia `paid_at`.
-- Comentarios: responder, editar o hacer soft-delete para moderacion. Los comentarios eliminados pueden verse como registros marcados para el admin; el cliente ya no recibe esas filas por RLS.
+- Comentarios: responder, editar o hacer soft-delete para moderacion. Los comentarios eliminados pueden verse como registros marcados para el admin; la vista cliente filtra `deleted_at is null` aunque RLS permita leer los propios eliminados.
 - Actividad: leer `audit_logs` del proyecto, ordenar por fecha y traducir acciones conocidas (`project_progress_changed`, `phase_completed`, `payment_status_changed`, etc.) a texto legible. Mostrar `old_values`/`new_values` en un detalle sobrio solo al abrirlo.
 
 No incluir botones de borrado fisico de proyectos o clientes en la primera UI. El backend permite operaciones administrativas, pero el cierre conserva historial y `projects.client_id` restringe borrar clientes con proyectos. La eliminacion irreversible puede disenarse despues de definir su politica de retencion.

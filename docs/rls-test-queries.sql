@@ -69,6 +69,19 @@ where project_id = '22222222-2222-2222-2222-222222222222'
   and user_id = '00000000-0000-0000-0000-000000000002'
   and message = 'Client RLS edited comment.';
 
+-- The author can still read their deleted comment, but it cannot be edited again.
+select id, deleted_at from public.comments
+where user_id = '00000000-0000-0000-0000-000000000002'
+  and message = 'Client RLS edited comment.'
+  and deleted_at is not null;
+
+update public.comments
+set message = 'This must not be saved.'
+where user_id = '00000000-0000-0000-0000-000000000002'
+  and message = 'Client RLS edited comment.'
+  and deleted_at is not null
+returning id;
+
 -- ---------------------------------------------------------------------------
 -- CLIENT negative tests
 -- These must affect zero rows or return an empty result because RLS blocks them.
