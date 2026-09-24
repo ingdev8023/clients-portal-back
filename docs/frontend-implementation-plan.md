@@ -19,7 +19,7 @@ Este documento adapta `implementation_plan_front.md` al esquema y las policies e
 | Tipografia | Fuente sans-serif del sistema al inicio | Buen rendimiento y sin dependencia de Google Fonts. |
 | Divisa | Mostrar los importes demo como COP con `Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' })` | `payments` no tiene columna `currency`; no inferir divisa por navegador. |
 | Orden de fases | Crear al final con `position = max + 1`; no arrastrar para reordenar en el MVP | El indice unico de `(project_id, position)` requiere una operacion atomica para intercambiar posiciones. |
-| Alta de usuarios | Admin crea cuentas en Supabase Dashboard y asigna `client_users` alli | El navegador no puede crear usuarios Auth con privilegios de administrador. |
+| Alta de usuarios | Admin usa el modal Nuevo cliente, que invoca la Edge Function autenticada `create-client` | La funcion verifica el rol admin, usa Auth Admin solo en el servidor y crea `clients` + `client_users`; ninguna clave privilegiada llega al navegador. |
 
 No fijar versiones exactas en este documento. Al implementar, instalar versiones estables compatibles, guardar `package-lock.json` y comprobar los comandos contra la documentacion vigente.
 

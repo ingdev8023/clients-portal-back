@@ -61,6 +61,11 @@ Tablas:
 - `project_updates`: timeline creado solo por admin.
 - `payments`: estado financiero informativo, sin tarjetas ni datos sensibles.
 - `comments`: conversación simple por proyecto.
+
+La Edge Function `create-client` permite que un administrador autenticado cree
+la cuenta Auth, la organización `clients` y su vínculo `client_users` desde el
+portal. La función vuelve a verificar el rol en `profiles` antes de usar Auth
+Admin y elimina registros parciales si falla un paso posterior.
 - `audit_logs`: trazabilidad administrativa.
 
 Enums:

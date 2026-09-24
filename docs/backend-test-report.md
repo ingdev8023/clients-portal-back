@@ -1,6 +1,6 @@
 # Verificacion del backend
 
-Fecha: 2026-09-17/18. Proyecto de pruebas: `hmyumxnkcxnbbtieefqk` (`https://hmyumxnkcxnbbtieefqk.supabase.co`).
+Fecha: 2026-09-17/18, verificado nuevamente el 2026-09-24. Proyecto de pruebas: `hmyumxnkcxnbbtieefqk` (`https://hmyumxnkcxnbbtieefqk.supabase.co`).
 
 ## PostgreSQL local
 
@@ -11,7 +11,7 @@ Se uso una instancia temporal de PostgreSQL 18.4 con esquemas y roles minimos qu
 - Se vinculo el proyecto con Supabase CLI 2.117.0 y se aplicaron las dos migraciones. `db push --dry-run` confirma que no quedan migraciones pendientes.
 - Las nueve tablas del portal tienen RLS habilitado. Se crearon dos usuarios confirmados mediante Auth Admin API; el trigger creo sus perfiles y se promovio solo `admin@example.com`.
 - El seed remoto quedo en 2 usuarios Auth, 2 perfiles, 1 cliente, 1 proyecto, 5 fases, 2 actualizaciones, 2 pagos y 1 comentario.
-- `docs/rls-test-queries.sql`, con los UUID reales y `ROLLBACK`, paso antes y despues de la migracion de endurecimiento. Verifico aislamiento entre clientes, cambios administrativos, cierre/reapertura y auditoria de borrados.
+- `docs/rls-test-queries.sql`, con descubrimiento automatico de los UUID reales y `ROLLBACK`, paso antes y despues de la migracion de endurecimiento. Verifico aislamiento entre clientes, cambios administrativos, cierre/reapertura y auditoria de borrados.
 - El login real de admin y cliente funciono con la publishable key. Por PostgREST el cliente recibio 1 perfil, 1 relacion cliente, 1 cliente, 1 proyecto, 5 fases, 2 actualizaciones, 2 pagos, 1 comentario y 0 logs de auditoria. El admin recibio 2 perfiles y acceso a auditoria.
 - Con JWT de cliente, una actualizacion de progreso afecto cero filas. Crear, editar y hacer soft-delete de un comentario propio funciono; el comentario eliminado quedo legible para su autor pero excluido por `deleted_at is null`, y no pudo editarse otra vez. Ese comentario temporal se elimino despues de la prueba.
 - `auth.enable_signup` se cambio a `false` mediante `config push`. Una solicitud publica de signup fue rechazada y el login de la cuenta cliente existente siguio funcionando.
@@ -22,4 +22,10 @@ Las contrasenas aleatorias de las dos cuentas demo estan en `C:\Users\artej\AppD
 
 El soft-delete fallaba originalmente porque RLS ocultaba la fila despues de marcarla como eliminada. La policy ahora conserva lectura para el autor; la UI debe filtrar `deleted_at is null`. Una segunda migracion fijo `search_path` en nueve funciones de trigger del portal y elimino sus nueve avisos del asesor de seguridad.
 
-Quedan avisos del asesor sobre `public.rls_auto_enable()` (funcion event trigger administrada por Supabase con grants de ejecucion) y sobre la proteccion contra contrasenas filtradas desactivada. No se modifico la funcion administrada. La prueba del frontend visual aun no aplica porque esa etapa no esta implementada.
+El 2026-09-24 se revoco `EXECUTE` para `PUBLIC`, `anon` y `authenticated` sobre `public.rls_auto_enable()` mediante una migracion guardada y aplicada al proyecto vinculado. El asesor ya no informa las dos exposiciones de esa funcion y la suite RLS remota volvio a pasar con todas sus escrituras revertidas.
+
+Solo queda el aviso de proteccion contra contrasenas filtradas desactivada. Debe habilitarse desde Auth en el proyecto alojado antes de exponer el portal; su disponibilidad puede depender del plan de Supabase.
+
+## Alta de clientes
+
+El 2026-09-24 se desplego la Edge Function autenticada `create-client` (version 1, estado `ACTIVE`). La funcion valida nuevamente el JWT y el rol `admin`, crea el usuario con Auth Admin solo en el servidor, crea `clients` y `client_users`, y elimina registros parciales si falla un paso. Una solicitud sin autenticacion devolvio `401` y no creo datos.
